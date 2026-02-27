@@ -1,3 +1,2 @@
-# No external dependencies required.
-# All standard-library modules (json, random, datetime, http.server, urllib.parse)
-# are available in Vercel's Python runtime.
+# No external packages required — ShipPull uses Python stdlib only.
+# (urllib, json, re, base64, email, http.server)

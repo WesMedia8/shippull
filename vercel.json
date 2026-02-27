@@ -1,5 +1,11 @@
 {
   "rewrites": [
-    { "source": "/api", "destination": "/api/index" }
+    { "source": "/api/auth",      "destination": "/api/auth" },
+    { "source": "/api/callback",  "destination": "/api/callback" },
+    { "source": "/api/accounts",  "destination": "/api/accounts" },
+    { "source": "/api/sync",      "destination": "/api/sync" },
+    { "source": "/api/orders",    "destination": "/api/orders" },
+    { "source": "/api/order",     "destination": "/api/order" },
+    { "source": "/api/stats",     "destination": "/api/stats" }
   ]
 }

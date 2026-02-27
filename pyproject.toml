@@ -1,6 +1,6 @@
 [project]
 name = "shippull"
-version = "0.1.0"
-description = "Reseller shipment tracker"
+version = "0.2.0"
+description = "Reseller shipment tracker with real Gmail OAuth integration"
 requires-python = ">=3.9"
 dependencies = []

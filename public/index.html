@@ -32,7 +32,7 @@
                 <span class="sync-dot"></span>
                 <span class="sync-text" id="syncText">Last synced: just now</span>
             </div>
-            <button class="btn-sync" id="btnSync" title="Sync emails" style="display:none;">
+            <button class="btn-sync" id="btnSync" title="Sync emails now" style="display:none;">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M2 8C2 4.686 4.686 2 8 2C10.21 2 12.117 3.253 13.064 5.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                     <path d="M14 8C14 11.314 11.314 14 8 14C5.79 14 3.883 12.747 2.936 10.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -50,6 +50,10 @@
                     <div class="dropdown-header">Connected Accounts</div>
                     <div id="dropdownAccountsList"></div>
                     <div class="dropdown-divider"></div>
+                    <a href="/api/auth" class="dropdown-item dropdown-item-action" id="dropdownAddAccount">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7 4V10M4 7H10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        Add Another Account
+                    </a>
                     <a href="#settings" class="dropdown-item dropdown-item-action">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 9C8.105 9 9 8.105 9 7C9 5.895 8.105 5 7 5C5.895 5 5 5.895 5 7C5 8.105 5.895 9 7 9Z" stroke="currentColor" stroke-width="1.2"/><path d="M11.4 8.6L10.8 9.6C10.6 9.9 10.3 10 10 10H9.5L8.8 10.7V11.2C8.8 11.5 8.7 11.8 8.4 12L7.4 12.6C7.1 12.8 6.8 12.8 6.6 12.6L5.6 12C5.3 11.8 5.2 11.5 5.2 11.2V10.7L4.5 10H4C3.7 10 3.4 9.9 3.2 9.6L2.6 8.6C2.4 8.3 2.4 8 2.6 7.7L3 7L2.6 6.3C2.4 6 2.4 5.7 2.6 5.4L3.2 4.4C3.4 4.1 3.7 4 4 4H4.5L5.2 3.3V2.8C5.2 2.5 5.3 2.2 5.6 2L6.6 1.4C6.9 1.2 7.2 1.2 7.4 1.4L8.4 2C8.7 2.2 8.8 2.5 8.8 2.8V3.3L9.5 4H10C10.3 4 10.6 4.1 10.8 4.4L11.4 5.4C11.6 5.7 11.6 6 11.4 6.3L11 7L11.4 7.7C11.6 8 11.6 8.3 11.4 8.6Z" stroke="currentColor" stroke-width="1.2"/></svg>
                         Manage Accounts
@@ -77,19 +81,20 @@
                     </svg>
                 </div>
                 <h1 class="connect-title">Track Every Shipment.<br>One Dashboard.</h1>
-                <p class="connect-subtitle">Connect your Gmail accounts to automatically track all your orders and shipments in one place. ShipPull parses confirmation emails from retailers and gives you a real-time view of everything in transit.</p>
-                
-                <div class="connect-form">
-                    <div class="input-group">
-                        <input type="email" id="connectEmailInput" class="input-email" placeholder="Enter your Gmail address..." autocomplete="email">
-                        <button class="btn-connect" id="btnConnect">
-                            <span class="btn-connect-text">Connect Account</span>
-                            <span class="btn-connect-loading" style="display:none;">
-                                <span class="spinner"></span> Syncing...
-                            </span>
-                        </button>
-                    </div>
-                    <p class="connect-note">For this demo, enter any email to see the tracker in action with sample data.</p>
+                <p class="connect-subtitle">Connect your Gmail account and ShipPull automatically reads your order confirmation and shipping emails — extracting tracking numbers, carriers, and delivery estimates in real time.</p>
+
+                <div class="connect-gmail-btn-wrap">
+                    <a href="/api/auth" class="btn-gmail-connect" id="btnGmailConnect">
+                        <!-- Google "G" logo -->
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M19.6 10.23c0-.68-.06-1.36-.18-2H10v3.77h5.4a4.62 4.62 0 0 1-2 3.04v2.52h3.23c1.89-1.74 2.97-4.3 2.97-7.33z" fill="#4285F4"/>
+                            <path d="M10 20c2.7 0 4.97-.9 6.63-2.44l-3.23-2.52c-.9.6-2.04.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H1.07v2.6A9.99 9.99 0 0 0 10 20z" fill="#34A853"/>
+                            <path d="M4.4 11.88A6.02 6.02 0 0 1 4.08 10c0-.65.11-1.28.32-1.88V5.52H1.07A9.99 9.99 0 0 0 0 10c0 1.61.39 3.14 1.07 4.48l3.33-2.6z" fill="#FBBC05"/>
+                            <path d="M10 3.98c1.46 0 2.78.5 3.81 1.49l2.86-2.86C14.97.9 12.7 0 10 0A9.99 9.99 0 0 0 1.07 5.52l3.33 2.6C5.2 5.74 7.4 3.98 10 3.98z" fill="#EA4335"/>
+                        </svg>
+                        Connect Gmail Account
+                    </a>
+                    <p class="connect-privacy-note">Read-only access · No emails stored · OAuth 2.0 secured</p>
                 </div>
 
                 <div class="connect-features">
@@ -97,22 +102,22 @@
                         <div class="feature-icon">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4Z" stroke="currentColor" stroke-width="1.5"/><path d="M22 6L12 13L2 6" stroke="currentColor" stroke-width="1.5"/></svg>
                         </div>
-                        <h3>Email Parsing</h3>
-                        <p>Automatically detects order confirmations and shipping updates from 50+ retailers</p>
+                        <h3>Auto-Parsed Emails</h3>
+                        <p>Detects order confirmations and shipping updates from 30+ retailers automatically</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 22C17.523 22 22 17.523 22 12C22 6.477 17.523 2 12 2C6.477 2 2 6.477 2 12C2 17.523 6.477 22 12 22Z" stroke="currentColor" stroke-width="1.5"/><path d="M12 6V12L16 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                         </div>
-                        <h3>Real-Time Tracking</h3>
-                        <p>Live status updates from UPS, FedEx, USPS, and DHL — all in one place</p>
+                        <h3>Live Tracking</h3>
+                        <p>UPS, FedEx, USPS, and DHL tracking numbers extracted and linked instantly</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M16 4H18C19.1 4 20 4.9 20 6V20C20 21.1 19.1 22 18 22H6C4.9 22 4 21.1 4 20V6C4 4.9 4.9 4 6 4H8" stroke="currentColor" stroke-width="1.5"/><rect x="8" y="2" width="8" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </div>
                         <h3>Multi-Account</h3>
-                        <p>Connect multiple Gmail accounts for all your reseller operations</p>
+                        <p>Connect multiple Gmail accounts to track all your reseller operations in one view</p>
                     </div>
                 </div>
             </div>
@@ -149,7 +154,7 @@
         <div class="filters-bar">
             <div class="filter-search">
                 <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                <input type="text" id="searchInput" class="input-search" placeholder="Search orders, retailers, tracking...">
+                <input type="text" id="searchInput" class="input-search" placeholder="Search orders, retailers, tracking numbers...">
             </div>
             <div class="filter-group">
                 <select id="filterStatus" class="filter-select">
@@ -169,18 +174,56 @@
                     <option value="eta">By ETA</option>
                     <option value="cost_desc">By Cost (High→Low)</option>
                 </select>
+                <!-- View Toggle -->
+                <div class="view-toggle" id="viewToggle">
+                    <button class="view-btn active" id="btnViewGrid" title="Grid view" aria-label="Grid view">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                            <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                            <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                            <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                    </button>
+                    <button class="view-btn" id="btnViewList" title="List view" aria-label="List view">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M3 4H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M3 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M3 12H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            <circle cx="1.5" cy="4" r="1" fill="currentColor"/>
+                            <circle cx="1.5" cy="8" r="1" fill="currentColor"/>
+                            <circle cx="1.5" cy="12" r="1" fill="currentColor"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Orders Grid -->
-        <div class="orders-grid" id="ordersGrid">
-            <!-- Dynamically populated -->
+        <!-- Orders Grid View -->
+        <div class="orders-grid" id="ordersGrid"></div>
+
+        <!-- Orders List View -->
+        <div class="orders-list-wrap" id="ordersListWrap" style="display:none;">
+            <table class="orders-table" id="ordersTable">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Item</th>
+                        <th>Retailer</th>
+                        <th>Cost</th>
+                        <th>Carrier</th>
+                        <th>Tracking</th>
+                        <th>ETA</th>
+                        <th>Account</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersTableBody"></tbody>
+            </table>
         </div>
 
         <!-- Empty State -->
         <div class="empty-state" id="emptyState" style="display:none;">
             <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="12" width="40" height="28" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 18H44" stroke="currentColor" stroke-width="1.5"/><path d="M16 6L24 12L32 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <p>No orders found matching your filters.</p>
+            <p id="emptyStateMsg">No orders found. Connect a Gmail account and sync to pull your shipments.</p>
         </div>
     </main>
 
@@ -188,25 +231,25 @@
     <main class="page page-settings" id="pageSettings" style="display:none;">
         <div class="settings-wrapper">
             <h2 class="settings-title">Settings</h2>
-            
+
             <div class="settings-section">
                 <h3 class="settings-section-title">Connected Accounts</h3>
-                <p class="settings-section-desc">Manage your connected Gmail accounts. Each account's emails are parsed for order and shipping confirmations.</p>
-                
+                <p class="settings-section-desc">Each connected Gmail account is scanned for order confirmations and shipping notifications. ShipPull has read-only access — it never sends emails or modifies your inbox.</p>
+
                 <div class="accounts-list" id="settingsAccountsList">
                     <!-- Dynamically populated -->
                 </div>
-                
-                <div class="add-account-form">
-                    <div class="input-group">
-                        <input type="email" id="settingsEmailInput" class="input-email" placeholder="Enter Gmail address to connect...">
-                        <button class="btn-connect btn-sm" id="btnSettingsConnect">
-                            <span class="btn-connect-text">Add Account</span>
-                            <span class="btn-connect-loading" style="display:none;">
-                                <span class="spinner"></span> Adding...
-                            </span>
-                        </button>
-                    </div>
+
+                <div class="add-account-area">
+                    <a href="/api/auth" class="btn-gmail-connect btn-gmail-sm">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M19.6 10.23c0-.68-.06-1.36-.18-2H10v3.77h5.4a4.62 4.62 0 0 1-2 3.04v2.52h3.23c1.89-1.74 2.97-4.3 2.97-7.33z" fill="#4285F4"/>
+                            <path d="M10 20c2.7 0 4.97-.9 6.63-2.44l-3.23-2.52c-.9.6-2.04.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H1.07v2.6A9.99 9.99 0 0 0 10 20z" fill="#34A853"/>
+                            <path d="M4.4 11.88A6.02 6.02 0 0 1 4.08 10c0-.65.11-1.28.32-1.88V5.52H1.07A9.99 9.99 0 0 0 0 10c0 1.61.39 3.14 1.07 4.48l3.33-2.6z" fill="#FBBC05"/>
+                            <path d="M10 3.98c1.46 0 2.78.5 3.81 1.49l2.86-2.86C14.97.9 12.7 0 10 0A9.99 9.99 0 0 0 1.07 5.52l3.33 2.6C5.2 5.74 7.4 3.98 10 3.98z" fill="#EA4335"/>
+                        </svg>
+                        Connect Another Gmail Account
+                    </a>
                 </div>
             </div>
 
@@ -216,7 +259,7 @@
                 <div class="settings-option">
                     <div class="settings-option-info">
                         <span class="settings-option-label">Auto-sync frequency</span>
-                        <span class="settings-option-desc">How often ShipPull checks for new emails</span>
+                        <span class="settings-option-desc">How often ShipPull checks for new emails (requires page reload)</span>
                     </div>
                     <select class="filter-select">
                         <option>Every 15 minutes</option>
