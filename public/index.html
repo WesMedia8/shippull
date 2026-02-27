@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShipPull — Reseller Shipment Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <!-- NAVIGATION -->
+    <nav class="top-nav">
+        <div class="nav-left">
+            <a href="#dashboard" class="nav-logo">
+                <svg class="logo-icon" width="28" height="28" viewBox="0 0 28 28" fill="none">
+                    <rect x="2" y="8" width="24" height="16" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                    <path d="M2 12H26" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M9 4L14 8L19 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <rect x="6" y="16" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1"/>
+                </svg>
+                <span class="logo-text">ShipPull</span>
+            </a>
+            <div class="nav-links">
+                <a href="#dashboard" class="nav-link" data-page="dashboard">Dashboard</a>
+                <a href="#settings" class="nav-link" data-page="settings">Settings</a>
+            </div>
+        </div>
+        <div class="nav-right">
+            <div class="sync-indicator" id="syncIndicator" style="display:none;">
+                <span class="sync-dot"></span>
+                <span class="sync-text" id="syncText">Last synced: just now</span>
+            </div>
+            <button class="btn-sync" id="btnSync" title="Sync emails" style="display:none;">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M2 8C2 4.686 4.686 2 8 2C10.21 2 12.117 3.253 13.064 5.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M14 8C14 11.314 11.314 14 8 14C5.79 14 3.883 12.747 2.936 10.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M10 5H13.5V1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M6 11H2.5V14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="accounts-dropdown" id="accountsDropdown" style="display:none;">
+                <button class="btn-accounts" id="btnAccounts">
+                    <span class="accounts-avatars" id="accountsAvatars"></span>
+                    <span class="accounts-count" id="accountsCount">0 accounts</span>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5L6 8L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <div class="dropdown-header">Connected Accounts</div>
+                    <div id="dropdownAccountsList"></div>
+                    <div class="dropdown-divider"></div>
+                    <a href="#settings" class="dropdown-item dropdown-item-action">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 9C8.105 9 9 8.105 9 7C9 5.895 8.105 5 7 5C5.895 5 5 5.895 5 7C5 8.105 5.895 9 7 9Z" stroke="currentColor" stroke-width="1.2"/><path d="M11.4 8.6L10.8 9.6C10.6 9.9 10.3 10 10 10H9.5L8.8 10.7V11.2C8.8 11.5 8.7 11.8 8.4 12L7.4 12.6C7.1 12.8 6.8 12.8 6.6 12.6L5.6 12C5.3 11.8 5.2 11.5 5.2 11.2V10.7L4.5 10H4C3.7 10 3.4 9.9 3.2 9.6L2.6 8.6C2.4 8.3 2.4 8 2.6 7.7L3 7L2.6 6.3C2.4 6 2.4 5.7 2.6 5.4L3.2 4.4C3.4 4.1 3.7 4 4 4H4.5L5.2 3.3V2.8C5.2 2.5 5.3 2.2 5.6 2L6.6 1.4C6.9 1.2 7.2 1.2 7.4 1.4L8.4 2C8.7 2.2 8.8 2.5 8.8 2.8V3.3L9.5 4H10C10.3 4 10.6 4.1 10.8 4.4L11.4 5.4C11.6 5.7 11.6 6 11.4 6.3L11 7L11.4 7.7C11.6 8 11.6 8.3 11.4 8.6Z" stroke="currentColor" stroke-width="1.2"/></svg>
+                        Manage Accounts
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- CONNECT PAGE -->
+    <main class="page page-connect" id="pageConnect">
+        <div class="connect-wrapper">
+            <div class="connect-hero">
+                <div class="connect-icon">
+                    <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                        <rect x="6" y="18" width="52" height="34" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
+                        <path d="M6 26H58" stroke="currentColor" stroke-width="2"/>
+                        <path d="M20 8L32 18L44 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect x="14" y="34" width="14" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                        <line x1="38" y1="35" x2="50" y2="35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        <line x1="38" y1="41" x2="46" y2="41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <h1 class="connect-title">Track Every Shipment.<br>One Dashboard.</h1>
+                <p class="connect-subtitle">Connect your Gmail accounts to automatically track all your orders and shipments in one place. ShipPull parses confirmation emails from retailers and gives you a real-time view of everything in transit.</p>
+                
+                <div class="connect-form">
+                    <div class="input-group">
+                        <input type="email" id="connectEmailInput" class="input-email" placeholder="Enter your Gmail address..." autocomplete="email">
+                        <button class="btn-connect" id="btnConnect">
+                            <span class="btn-connect-text">Connect Account</span>
+                            <span class="btn-connect-loading" style="display:none;">
+                                <span class="spinner"></span> Syncing...
+                            </span>
+                        </button>
+                    </div>
+                    <p class="connect-note">For this demo, enter any email to see the tracker in action with sample data.</p>
+                </div>
+
+                <div class="connect-features">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4Z" stroke="currentColor" stroke-width="1.5"/><path d="M22 6L12 13L2 6" stroke="currentColor" stroke-width="1.5"/></svg>
+                        </div>
+                        <h3>Email Parsing</h3>
+                        <p>Automatically detects order confirmations and shipping updates from 50+ retailers</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 22C17.523 22 22 17.523 22 12C22 6.477 17.523 2 12 2C6.477 2 2 6.477 2 12C2 17.523 6.477 22 12 22Z" stroke="currentColor" stroke-width="1.5"/><path d="M12 6V12L16 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </div>
+                        <h3>Real-Time Tracking</h3>
+                        <p>Live status updates from UPS, FedEx, USPS, and DHL — all in one place</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M16 4H18C19.1 4 20 4.9 20 6V20C20 21.1 19.1 22 18 22H6C4.9 22 4 21.1 4 20V6C4 4.9 4.9 4 6 4H8" stroke="currentColor" stroke-width="1.5"/><rect x="8" y="2" width="8" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                        <h3>Multi-Account</h3>
+                        <p>Connect multiple Gmail accounts for all your reseller operations</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- DASHBOARD PAGE -->
+    <main class="page page-dashboard" id="pageDashboard" style="display:none;">
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="statTotal">0</div>
+                <div class="stat-label">Total Orders</div>
+            </div>
+            <div class="stat-card stat-transit">
+                <div class="stat-value" id="statTransit">0</div>
+                <div class="stat-label">In Transit</div>
+            </div>
+            <div class="stat-card stat-delivered">
+                <div class="stat-value" id="statDelivered">0</div>
+                <div class="stat-label">Delivered</div>
+            </div>
+            <div class="stat-card stat-processing">
+                <div class="stat-value" id="statProcessing">0</div>
+                <div class="stat-label">Processing</div>
+            </div>
+            <div class="stat-card stat-spent">
+                <div class="stat-value" id="statSpent">$0</div>
+                <div class="stat-label">Total Spent</div>
+            </div>
+        </div>
+
+        <!-- Filters Bar -->
+        <div class="filters-bar">
+            <div class="filter-search">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="text" id="searchInput" class="input-search" placeholder="Search orders, retailers, tracking...">
+            </div>
+            <div class="filter-group">
+                <select id="filterStatus" class="filter-select">
+                    <option value="">All Statuses</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="out_for_delivery">Out for Delivery</option>
+                    <option value="delivered">Delivered</option>
+                </select>
+                <select id="filterRetailer" class="filter-select">
+                    <option value="">All Retailers</option>
+                </select>
+                <select id="sortSelect" class="filter-select">
+                    <option value="newest">Newest First</option>
+                    <option value="status">By Status</option>
+                    <option value="eta">By ETA</option>
+                    <option value="cost_desc">By Cost (High→Low)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Orders Grid -->
+        <div class="orders-grid" id="ordersGrid">
+            <!-- Dynamically populated -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display:none;">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="12" width="40" height="28" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 18H44" stroke="currentColor" stroke-width="1.5"/><path d="M16 6L24 12L32 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <p>No orders found matching your filters.</p>
+        </div>
+    </main>
+
+    <!-- SETTINGS PAGE -->
+    <main class="page page-settings" id="pageSettings" style="display:none;">
+        <div class="settings-wrapper">
+            <h2 class="settings-title">Settings</h2>
+            
+            <div class="settings-section">
+                <h3 class="settings-section-title">Connected Accounts</h3>
+                <p class="settings-section-desc">Manage your connected Gmail accounts. Each account's emails are parsed for order and shipping confirmations.</p>
+                
+                <div class="accounts-list" id="settingsAccountsList">
+                    <!-- Dynamically populated -->
+                </div>
+                
+                <div class="add-account-form">
+                    <div class="input-group">
+                        <input type="email" id="settingsEmailInput" class="input-email" placeholder="Enter Gmail address to connect...">
+                        <button class="btn-connect btn-sm" id="btnSettingsConnect">
+                            <span class="btn-connect-text">Add Account</span>
+                            <span class="btn-connect-loading" style="display:none;">
+                                <span class="spinner"></span> Adding...
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h3 class="settings-section-title">Email Parsing</h3>
+                <p class="settings-section-desc">Configure how ShipPull processes your emails.</p>
+                <div class="settings-option">
+                    <div class="settings-option-info">
+                        <span class="settings-option-label">Auto-sync frequency</span>
+                        <span class="settings-option-desc">How often ShipPull checks for new emails</span>
+                    </div>
+                    <select class="filter-select">
+                        <option>Every 15 minutes</option>
+                        <option>Every 30 minutes</option>
+                        <option selected>Every hour</option>
+                        <option>Every 6 hours</option>
+                    </select>
+                </div>
+                <div class="settings-option">
+                    <div class="settings-option-info">
+                        <span class="settings-option-label">Parse order confirmations</span>
+                        <span class="settings-option-desc">Detect new orders from retailer emails</span>
+                    </div>
+                    <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="settings-option">
+                    <div class="settings-option-info">
+                        <span class="settings-option-label">Parse shipping notifications</span>
+                        <span class="settings-option-desc">Detect tracking updates and delivery status</span>
+                    </div>
+                    <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h3 class="settings-section-title">Notifications</h3>
+                <p class="settings-section-desc">Get notified about important shipment updates.</p>
+                <div class="settings-option">
+                    <div class="settings-option-info">
+                        <span class="settings-option-label">Delivery notifications</span>
+                        <span class="settings-option-desc">Notify when a package is delivered</span>
+                    </div>
+                    <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="settings-option">
+                    <div class="settings-option-info">
+                        <span class="settings-option-label">Shipping delay alerts</span>
+                        <span class="settings-option-desc">Notify when an ETA changes or shipment is delayed</span>
+                    </div>
+                    <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ORDER DETAIL MODAL -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="orderModal">
+            <button class="modal-close" id="modalClose">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5L15 15M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <div class="modal-content" id="modalContent">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+# No external dependencies required.
+# All standard-library modules (json, random, datetime, http.server, urllib.parse)
+# are available in Vercel's Python runtime.
