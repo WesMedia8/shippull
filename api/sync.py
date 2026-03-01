@@ -99,6 +99,99 @@ CARRIER_TRACKING_URLS = {
 }
 
 # ---------------------------------------------------------------------------
+# Blocklisted senders — these are NOT real orders/shipments
+# Subscriptions, streaming, newsletters, marketing, digital-only services
+# ---------------------------------------------------------------------------
+BLOCKED_DOMAINS = {
+    # Digital/streaming services
+    "audible.com", "audible.co.uk", "audible.de",
+    "netflix.com", "spotify.com", "hulu.com",
+    "disneyplus.com", "hbomax.com", "max.com",
+    "youtube.com", "google.com", "play.google.com",
+    "twitch.tv", "crunchyroll.com",
+    # Social media
+    "facebook.com", "facebookmail.com", "meta.com",
+    "instagram.com", "twitter.com", "x.com",
+    "linkedin.com", "tiktok.com", "pinterest.com",
+    # Email/productivity
+    "gmail.com", "outlook.com", "yahoo.com",
+    "slack.com", "zoom.us", "notion.so",
+    # Food delivery (not reseller items)
+    "doordash.com", "ubereats.com", "grubhub.com",
+    "postmates.com", "instacart.com",
+    # Ride services
+    "uber.com", "lyft.com",
+    # Banking/payments
+    "paypal.com", "venmo.com", "cashapp.com",
+    "chase.com", "bankofamerica.com", "wellsfargo.com",
+    # Software/SaaS
+    "github.com", "vercel.com", "heroku.com",
+    "amazonaws.com", "digitalocean.com",
+    # Gaming
+    "steampowered.com", "epicgames.com", "playstation.com",
+    "xbox.com", "ea.com",
+    # News/media
+    "medium.com", "substack.com", "nytimes.com",
+    "washingtonpost.com",
+}
+
+# Blocked sender keywords — if sender email or name contains these
+BLOCKED_SENDER_KEYWORDS = {
+    "newsletter", "noreply-marketing", "promo", "marketing",
+    "campaign", "digest", "weekly", "daily-digest",
+}
+
+# Brands that send marketing emails disguised as shipping/delivery notifications
+# These get caught by the is_real_order scoring too, but blocking outright is safer
+MARKETING_BRAND_DOMAINS = {
+    "fearofgod.com", "essentials.com",
+    "jfrnd.com", "jiberish.com",
+    "gruns.com", "getgruns.com",
+}
+
+# ---------------------------------------------------------------------------
+# Marketing / promo detection — subjects that look like orders but aren't
+# ---------------------------------------------------------------------------
+MARKETING_SUBJECT_PATTERNS = [
+    # "Last call" / urgency marketing
+    re.compile(r'last\s+call', re.IGNORECASE),
+    # "New" collection/arrivals/playlist
+    re.compile(r'new\s+(?:arrivals?|collection|season|drop|release|playlist|episode)', re.IGNORECASE),
+    # Sales/discounts
+    re.compile(r'\b(?:sale|% off|discount|coupon|promo code|free shipping|flash sale|clearance)\b', re.IGNORECASE),
+    # Newsletters
+    re.compile(r'\b(?:newsletter|weekly|digest|roundup|picks for you|recommended)\b', re.IGNORECASE),
+    # "Shop now" / "Buy now"
+    re.compile(r'\b(?:shop now|buy now|limited edition|exclusive access|early access|just dropped)\b', re.IGNORECASE),
+    # Fear of God / brand "delivery" marketing (new product line)
+    re.compile(r'\b(?:introducing|launching|collection|lookbook|editorial|campaign)\b', re.IGNORECASE),
+    # Restock alerts
+    re.compile(r'\b(?:back in stock|restock|coming soon|waitlist|notify me)\b', re.IGNORECASE),
+    # Review requests
+    re.compile(r'\b(?:review your|rate your|how was your|feedback|survey)\b', re.IGNORECASE),
+    # Rewards / loyalty
+    re.compile(r'\b(?:rewards?|loyalty|points|member|earn|redeem)\b', re.IGNORECASE),
+]
+
+# Strong positive signals — these indicate a REAL transactional email
+ORDER_SIGNAL_PATTERNS = [
+    re.compile(r'order\s*#\s*\d', re.IGNORECASE),                          # order #12345
+    re.compile(r'order\s+(?:number|id|no\.?)\s*:?\s*\d', re.IGNORECASE),   # order number: 123
+    re.compile(r'\btracking\s*(?:#|number|:)\s*\S', re.IGNORECASE),        # tracking #...
+    re.compile(r'\b1Z[A-Z0-9]{16}\b'),                                     # UPS tracking
+    re.compile(r'\b9[234]\d{18,22}\b'),                                    # USPS tracking
+    re.compile(r'\bTBA\d{10,}\b'),                                         # Amazon tracking
+    re.compile(r'\bitem(?:s)?\s+shipped\b', re.IGNORECASE),                 # items shipped
+    re.compile(r'\byour\s+(?:order|package|shipment)\s+(?:has|is|was)\b', re.IGNORECASE),
+    re.compile(r'\bshipping\s+(?:label|confirmation)\b', re.IGNORECASE),
+    re.compile(r'\best(?:imated)?\s+delivery\b', re.IGNORECASE),           # estimated delivery
+    re.compile(r'\b(?:out for|scheduled for)\s+delivery\b', re.IGNORECASE),
+    re.compile(r'\bdelivered\s+(?:to|at|on)\b', re.IGNORECASE),            # delivered to your door
+    re.compile(r'\b(?:ups|fedex|usps|dhl|ontrac)\b', re.IGNORECASE),       # carrier name
+    re.compile(r'\$\d+\.\d{2}', re.IGNORECASE),                            # dollar amount
+]
+
+# ---------------------------------------------------------------------------
 # Tracking number patterns
 # ---------------------------------------------------------------------------
 TRACKING_PATTERNS = [
@@ -143,12 +236,16 @@ DATE_PATTERNS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Gmail search query
+# Gmail search query — focused on transactional shipping emails
+# Using category:updates to prefer transactional over promotional
 # ---------------------------------------------------------------------------
 GMAIL_QUERY = (
-    'subject:(shipped OR tracking OR delivery OR "order confirmed" OR '
-    '"out for delivery" OR "has shipped" OR "is on its way" OR '
-    '"order confirmation" OR "shipping confirmation" OR "your order")'
+    '(subject:("has shipped" OR "is on its way" OR "out for delivery" '
+    'OR "shipping confirmation" OR "shipment notification" OR "track your" '
+    'OR "tracking number" OR "order confirmed" OR "order shipped") '
+    'OR from:(ups.com OR fedex.com OR usps.com OR dhl.com)) '
+    '-category:promotions -category:social '
+    '-subject:("sale" OR "% off" OR "newsletter" OR "new arrivals" OR "shop now")'
 )
 
 MAX_RESULTS = 100
@@ -266,7 +363,6 @@ def extract_tracking_number(text):
     for carrier, pattern in TRACKING_PATTERNS:
         m = pattern.search(text)
         if m:
-            # For patterns with a lookahead group, group(1) is the tracking number
             return carrier, m.group(1)
     return None, None
 
@@ -274,7 +370,6 @@ def extract_tracking_number(text):
 def _extract_url_param(url, param_names):
     """Extract a query parameter value from a URL string."""
     for param in param_names:
-        # Try ?param=VALUE or &param=VALUE
         m = re.search(r'(?:[?&])' + re.escape(param) + r'=([^&\s"]+)', url, re.IGNORECASE)
         if m:
             return m.group(1)
@@ -285,7 +380,6 @@ def _clean_tracking_number(raw):
     """Strip URL-encoding and whitespace from a candidate tracking number."""
     if not raw:
         return ""
-    # URL-decode %20 etc (simple pass)
     raw = raw.replace("%20", " ").replace("+", " ").strip()
     return raw
 
@@ -294,19 +388,14 @@ def extract_tracking_from_html(html):
     """
     Parse <a href> tags from raw HTML email to extract carrier tracking URLs.
     Returns (carrier, tracking_number, tracking_url) or (None, None, None).
-
-    Checks href for known carrier tracking domains first, then falls back
-    to checking the visible link text for tracking number patterns.
     """
     if not html:
         return None, None, None
 
-    # Find all anchor tags: href and inner text
     anchor_pattern = re.compile(
         r'<a[^>]+href=["\']([^"\'\s>]+)["\'][^>]*>(.*?)</a>',
         re.IGNORECASE | re.DOTALL
     )
-    # Also match href with unquoted or reversed attr order
     anchor_pattern2 = re.compile(
         r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
         re.IGNORECASE | re.DOTALL
@@ -315,7 +404,7 @@ def extract_tracking_from_html(html):
     anchors = []
     for m in anchor_pattern.finditer(html):
         href = m.group(1).strip()
-        text = re.sub(r'<[^>]+>', '', m.group(2)).strip()  # strip inner tags
+        text = re.sub(r'<[^>]+>', '', m.group(2)).strip()
         anchors.append((href, text))
 
     if not anchors:
@@ -329,14 +418,11 @@ def extract_tracking_from_html(html):
 
         # UPS
         if 'ups.com/track' in href_lower or 'ups.com/webtracking' in href_lower:
-            # Try common param names
             num = _extract_url_param(href, ['trackNums', 'tracknum', 'InquiryNumber', 'track'])
             if not num:
-                # Try to find 1Z tracking number in URL
                 m2 = re.search(r'(1Z[A-Z0-9]{16})', href, re.IGNORECASE)
                 num = m2.group(1) if m2 else None
             if not num:
-                # Try link text
                 m2 = re.search(r'\b(1Z[A-Z0-9]{16})\b', link_text, re.IGNORECASE)
                 num = m2.group(1) if m2 else None
             if num:
@@ -380,12 +466,10 @@ def extract_tracking_from_html(html):
             if num:
                 return "DHL", _clean_tracking_number(num), href
 
-        # Narvar (third-party tracking portal used by many retailers)
+        # Narvar
         elif 'narvar.com/tracking' in href_lower or '.narvar.com/track' in href_lower:
-            # Narvar URLs often have the carrier tracking num in the path or params
             num = _extract_url_param(href, ['tracking_number', 'id', 'track'])
             if not num:
-                # Check link text for common tracking formats
                 m2 = re.search(r'\b(1Z[A-Z0-9]{16}|9[234]\d{18,22}|\d{12}|\d{15}|TBA\d{10,})\b', link_text)
                 num = m2.group(1) if m2 else None
             if num:
@@ -396,7 +480,6 @@ def extract_tracking_from_html(html):
         elif 'aftership.com' in href_lower or 'track.aftership.com' in href_lower:
             num = _extract_url_param(href, ['number', 'tracking_number', 'id'])
             if not num:
-                # AfterShip URLs: /trackings/CARRIER/NUMBER
                 m2 = re.search(r'/trackings/[^/]+/([A-Z0-9-]{8,})', href, re.IGNORECASE)
                 num = m2.group(1) if m2 else None
             if not num:
@@ -424,10 +507,9 @@ def extract_tracking_from_html(html):
                 carrier = _guess_carrier_from_number(num)
                 return carrier, _clean_tracking_number(num), href
 
-        # Generic: any link whose text looks like a tracking number
-        # (catches cases where the link text IS the tracking number)
+        # Generic: link text looks like a tracking number
         if not any(skip in href_lower for skip in ('unsubscribe', 'mailto', 'javascript')):
-            for carrier_name, pat in TRACKING_PATTERNS[:5]:  # UPS, USPS, USPS, Amazon, OnTrac only
+            for carrier_name, pat in TRACKING_PATTERNS[:5]:
                 m2 = pat.search(link_text)
                 if m2:
                     return carrier_name, m2.group(1), href
@@ -470,14 +552,13 @@ def extract_product_images(html):
     if not html:
         return ""
 
-    # Find all <img> tags
     img_pattern = re.compile(r'<img\b[^>]+>', re.IGNORECASE | re.DOTALL)
     src_pattern  = re.compile(r'\bsrc=["\']([^"\'\s>]+)["\']', re.IGNORECASE)
     alt_pattern  = re.compile(r'\balt=["\']([^"\']*)["\']', re.IGNORECASE)
     width_pattern  = re.compile(r'\bwidth=["\']?(\d+)["\']?', re.IGNORECASE)
     height_pattern = re.compile(r'\bheight=["\']?(\d+)["\']?', re.IGNORECASE)
 
-    candidates = []  # (score, url)
+    candidates = []
 
     for img_tag in img_pattern.finditer(html):
         tag = img_tag.group(0)
@@ -487,56 +568,46 @@ def extract_product_images(html):
             continue
         src = src_m.group(1).strip()
 
-        # Must be HTTPS
         if not src.startswith('https://'):
             continue
 
-        # Skip 1-pixel tracking images by dimension attributes
         w_m = width_pattern.search(tag)
         h_m = height_pattern.search(tag)
         w = int(w_m.group(1)) if w_m else None
         h = int(h_m.group(1)) if h_m else None
         if (w is not None and w <= 1) or (h is not None and h <= 1):
             continue
-        # Skip small images (likely icons/badges)
         if (w is not None and w < 30) or (h is not None and h < 30):
             continue
 
-        # Skip by URL patterns
         if _IMG_SKIP_URL.search(src):
             continue
 
-        # Compute a score to rank product image quality
         score = 0
 
-        # Prefer Amazon product images
         if 'm.media-amazon.com' in src or 'images-na.ssl-images-amazon.com' in src or \
            'images-amazon.com' in src:
             score += 50
 
-        # Prefer larger declared dimensions
         if w is not None and h is not None:
             area = w * h
-            if area >= 40000:   # 200x200+
+            if area >= 40000:
                 score += 30
-            elif area >= 10000:  # 100x100+
+            elif area >= 10000:
                 score += 15
-            elif area >= 2500:   # 50x50+
+            elif area >= 2500:
                 score += 5
 
-        # Prefer images with meaningful alt text
         alt_m = alt_pattern.search(tag)
         alt = alt_m.group(1).strip() if alt_m else ""
         if alt and len(alt) > 3:
             score += 10
 
-        # Prefer CDN/product image URLs
         if any(cdn in src for cdn in ('cdn.shopify', 'cdn.shopifycdn', 'cloudinary',
                                        'fastly.net', 'akamaihd', 'scene7.com',
                                        'res.cloudinary', 'images.ctfassets')):
             score += 20
 
-        # Skip very low-score candidates
         if score < 0:
             continue
 
@@ -545,14 +616,12 @@ def extract_product_images(html):
     if not candidates:
         return ""
 
-    # Return highest-scoring image URL
     candidates.sort(key=lambda x: x[0], reverse=True)
     return candidates[0][1]
 
 
 def extract_cost(text):
     """Find the first dollar amount that looks like an order total."""
-    # Prefer "total: $X" or "order total $X" patterns
     total_pattern = re.compile(
         r'(?:order\s+total|subtotal|total)[:\s]+\$?([\d,]+\.?\d{0,2})',
         re.IGNORECASE
@@ -563,7 +632,6 @@ def extract_cost(text):
             return float(m.group(1).replace(",", ""))
         except ValueError:
             pass
-    # Fallback: any dollar amount >= 1
     amounts = re.findall(r'\$([\d,]+\.\d{2})', text)
     valid = []
     for a in amounts:
@@ -573,7 +641,6 @@ def extract_cost(text):
                 valid.append(val)
         except ValueError:
             pass
-    # Heuristic: use the largest amount up to $10k (likely order total)
     if valid:
         candidates = [v for v in valid if v <= 10000.0]
         if candidates:
@@ -601,14 +668,13 @@ def _parse_date_string(s):
     for fmt in ("%B %d, %Y", "%b %d, %Y", "%B %d", "%b %d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y"):
         try:
             d = datetime.strptime(s, fmt)
-            if d.year == 1900:  # strptime default when year not in string
+            if d.year == 1900:
                 d = d.replace(year=now.year)
                 if d < now:
                     d = d.replace(year=now.year + 1)
             return d.strftime("%Y-%m-%d")
         except ValueError:
             pass
-    # Try "Monday, January 15" style
     try:
         s2 = re.sub(
             r'^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+',
@@ -705,6 +771,96 @@ def _parse_email_date(date_str):
 
 
 # ---------------------------------------------------------------------------
+# Email classification — filter marketing from real orders
+# ---------------------------------------------------------------------------
+def is_blocked_sender(sender_email, sender_name=""):
+    """Return True if the sender is known to NOT send real shipping emails."""
+    if not sender_email:
+        return False
+    domain = sender_email.lower().split("@")[-1] if "@" in sender_email else sender_email.lower()
+    # Check exact domain
+    if domain in BLOCKED_DOMAINS:
+        return True
+    # Check marketing brand domains
+    if domain in MARKETING_BRAND_DOMAINS:
+        return True
+    # Check subdomain (e.g., email.audible.com)
+    for blocked in BLOCKED_DOMAINS | MARKETING_BRAND_DOMAINS:
+        if domain.endswith("." + blocked):
+            return True
+    # Check keyword patterns in email address
+    email_lower = sender_email.lower()
+    for kw in BLOCKED_SENDER_KEYWORDS:
+        if kw in email_lower:
+            return True
+    return False
+
+
+def is_real_order(subject, body_text, sender_email, tracking_number):
+    """
+    Score an email to determine if it's a real order/shipment notification
+    vs marketing/promotional noise. Returns True if it looks like a real order.
+
+    Scoring:
+      +3  tracking number found
+      +2  each strong order signal in subject
+      +1  each strong order signal in body (up to +5)
+      -3  each marketing pattern in subject
+      -1  each marketing pattern in body (up to -3)
+      +2  sent from a carrier (UPS, FedEx, etc.)
+      +1  contains dollar amount
+
+    Threshold: score >= 2 is a real order
+    """
+    score = 0
+    subject_lower = (subject or "").lower()
+    body_lower = (body_text or "")[:3000].lower()
+    combined = subject_lower + " " + body_lower
+
+    # Tracking number is a very strong signal
+    if tracking_number:
+        score += 3
+
+    # Check for carrier sender
+    if sender_email:
+        sender_domain = sender_email.lower().split("@")[-1] if "@" in sender_email else ""
+        for carrier_domain in CARRIER_MAP:
+            if sender_domain.endswith(carrier_domain):
+                score += 3
+                break
+
+    # Check strong order signals in subject (high weight)
+    for pattern in ORDER_SIGNAL_PATTERNS:
+        if pattern.search(subject):
+            score += 2
+
+    # Check strong order signals in body (lower weight, capped)
+    body_signal_count = 0
+    for pattern in ORDER_SIGNAL_PATTERNS:
+        if pattern.search(body_lower):
+            body_signal_count += 1
+            if body_signal_count >= 5:
+                break
+    score += body_signal_count
+
+    # Check marketing patterns in subject (heavy penalty)
+    for pattern in MARKETING_SUBJECT_PATTERNS:
+        if pattern.search(subject):
+            score -= 3
+
+    # Check marketing patterns in body (lighter penalty, capped)
+    body_marketing_count = 0
+    for pattern in MARKETING_SUBJECT_PATTERNS:
+        if pattern.search(body_lower):
+            body_marketing_count += 1
+            if body_marketing_count >= 3:
+                break
+    score -= body_marketing_count
+
+    return score >= 2
+
+
+# ---------------------------------------------------------------------------
 # Core sync logic per account
 # ---------------------------------------------------------------------------
 def sync_account(account, client_id, client_secret, page_token=None):
@@ -713,9 +869,9 @@ def sync_account(account, client_id, client_secret, page_token=None):
 
     Returns a dict:
     {
-        "orders": [...],          # list of parsed order dicts
-        "updated_token": str|None # new access token if refreshed, else None
-        "next_page_token": str|None
+        "orders": [...],
+        "updated_token": str|None,
+        "next_page_token": str|None,
         "error": str|None
     }
     """
@@ -780,6 +936,11 @@ def sync_account(account, client_id, client_secret, page_token=None):
 
         # 4. Parse sender
         sender_name, sender_email = parse_sender(from_header)
+
+        # 4.1 Skip blocked senders (digital services, social, marketing, etc.)
+        if is_blocked_sender(sender_email, sender_name):
+            continue
+
         retailer = detect_retailer(sender_email, sender_name)
         carrier_from_sender = detect_carrier_from_sender(sender_email)
 
@@ -805,7 +966,6 @@ def sync_account(account, client_id, client_secret, page_token=None):
             carrier, tracking_number = extract_tracking_number(combined_text)
             if not carrier and carrier_from_sender:
                 carrier = carrier_from_sender
-            # Build tracking URL from carrier base
             if tracking_number and carrier:
                 base_url = CARRIER_TRACKING_URLS.get(carrier, "")
                 tracking_url = base_url + tracking_number if base_url else ""
@@ -817,6 +977,10 @@ def sync_account(account, client_id, client_secret, page_token=None):
         if not tracking_url and tracking_number and carrier:
             base_url = CARRIER_TRACKING_URLS.get(carrier, "")
             tracking_url = base_url + tracking_number if base_url else ""
+
+        # 6.5 Check if this is a real order vs marketing noise
+        if not is_real_order(subject, body_text, sender_email, tracking_number):
+            continue
 
         # 7. Extract cost
         cost = extract_cost(combined_text)
@@ -889,7 +1053,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         all_orders = []
-        token_updates = {}  # email -> new access_token
+        token_updates = {}
         account_errors = {}
 
         for account in accounts:
