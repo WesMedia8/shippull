@@ -1,11 +1,22 @@
 """
 api/sync.py
-POST /api/sync — Fetch emails from Gmail for all connected accounts, parse shipping info,
-and store unique orders in the in-memory store. Uses only stdlib (urllib, json, re, base64).
+POST /api/sync — Stateless Gmail sync endpoint.
+
+Accepts a JSON body: {"accounts": [{"email", "access_token", "refresh_token"}]}
+Optionally: {"page_token": "..."} for pagination.
+
+For each account, fetches Gmail emails matching the shipping query,
+parses them, and returns all parsed orders as JSON.
+
+NO server-side storage. All state lives in the browser (localStorage).
+Token refreshes are returned in the response so the frontend can update
+its stored tokens.
 """
 import base64
 import json
+import os
 import re
+import sys
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlencode
@@ -97,8 +108,9 @@ TRACKING_PATTERNS = [
     ("USPS",  re.compile(r'\b(9[234]\d{18,22})\b')),
     # USPS intelligent mail: ~20 digit numbers beginning with common prefixes
     ("USPS",  re.compile(r'\b(420\d{17,22})\b')),
-    # FedEx: 12 or 15 digit all-numeric
+    # FedEx: 15 digit all-numeric
     ("FedEx", re.compile(r'\b(\d{15})\b')),
+    # FedEx: 12 digit all-numeric
     ("FedEx", re.compile(r'\b(\d{12})\b')),
     # DHL: 10 digit
     ("DHL",   re.compile(r'\b(\d{10})\b')),
@@ -108,18 +120,23 @@ TRACKING_PATTERNS = [
 # Delivery date patterns
 # ---------------------------------------------------------------------------
 DATE_PATTERNS = [
-    re.compile(r'(?:estimated delivery|est\.?\s+delivery|arriving|arrives|deliver(?:ed)?\s+by|expected\s+delivery|delivery\s+date)[:\s]+([A-Za-z]+\.?\s+\d{1,2}(?:,\s+\d{4})?|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})', re.IGNORECASE),
-    re.compile(r'\b((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2})\b', re.IGNORECASE),
-    re.compile(r'\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2}(?:,\s+\d{4})?)\b', re.IGNORECASE),
+    re.compile(
+        r'(?:estimated delivery|est\.?\s+delivery|arriving|arrives|deliver(?:ed)?\s+by|'
+        r'expected\s+delivery|delivery\s+date)[:\s]+'
+        r'([A-Za-z]+\.?\s+\d{1,2}(?:,\s+\d{4})?|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
+        re.IGNORECASE
+    ),
+    re.compile(
+        r'\b((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+'
+        r'(?:January|February|March|April|May|June|July|August|September|October|November|December)'
+        r'\s+\d{1,2})\b',
+        re.IGNORECASE
+    ),
+    re.compile(
+        r'\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2}(?:,\s+\d{4})?)\b',
+        re.IGNORECASE
+    ),
 ]
-
-MONTH_MAP = {
-    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
-    'january': 1, 'february': 2, 'march': 3, 'april': 4,
-    'june': 6, 'july': 7, 'august': 8, 'september': 9,
-    'october': 10, 'november': 11, 'december': 12,
-}
 
 # ---------------------------------------------------------------------------
 # Gmail search query
@@ -138,7 +155,6 @@ MAX_RESULTS = 50
 # ---------------------------------------------------------------------------
 def refresh_access_token(refresh_token, client_id, client_secret):
     """Use a refresh token to get a new access token. Returns new access_token or None."""
-    import os
     if not refresh_token:
         return None
     body = urlencode({
@@ -225,7 +241,7 @@ def detect_retailer(sender_email, sender_name=""):
                 return name
     # Fall back to sender name
     if sender_name:
-        cleaned = re.sub(r'["\']', '', sender_name).strip()
+        cleaned = re.sub(r'["\u2018\u2019\u201c\u201d\'`]', '', sender_name).strip()
         if cleaned:
             return cleaned[:40]
     return "Unknown"
@@ -253,7 +269,10 @@ def extract_tracking_number(text):
 def extract_cost(text):
     """Find the first dollar amount that looks like an order total."""
     # Prefer "total: $X" or "order total $X" patterns
-    total_pattern = re.compile(r'(?:order\s+total|subtotal|total)[:\s]+\$?([\d,]+\.?\d{0,2})', re.IGNORECASE)
+    total_pattern = re.compile(
+        r'(?:order\s+total|subtotal|total)[:\s]+\$?([\d,]+\.?\d{0,2})',
+        re.IGNORECASE
+    )
     m = total_pattern.search(text)
     if m:
         try:
@@ -270,7 +289,7 @@ def extract_cost(text):
                 valid.append(val)
         except ValueError:
             pass
-    # Heuristic: use the largest amount up to $10k (likely order total, not shipping cost)
+    # Heuristic: use the largest amount up to $10k (likely order total)
     if valid:
         candidates = [v for v in valid if v <= 10000.0]
         if candidates:
@@ -285,7 +304,6 @@ def extract_delivery_date(text):
         m = pattern.search(text)
         if m:
             raw = m.group(1).strip()
-            # Try to parse various formats
             parsed = _parse_date_string(raw)
             if parsed:
                 return parsed
@@ -296,7 +314,6 @@ def _parse_date_string(s):
     """Attempt to parse a loose date string to YYYY-MM-DD."""
     now = datetime.now()
     s = s.strip().rstrip(",")
-    # Try common formats
     for fmt in ("%B %d, %Y", "%b %d, %Y", "%B %d", "%b %d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y"):
         try:
             d = datetime.strptime(s, fmt)
@@ -309,8 +326,10 @@ def _parse_date_string(s):
             pass
     # Try "Monday, January 15" style
     try:
-        # strip day-of-week
-        s2 = re.sub(r'^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+', '', s, flags=re.IGNORECASE)
+        s2 = re.sub(
+            r'^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+',
+            '', s, flags=re.IGNORECASE
+        )
         d = datetime.strptime(s2.strip(), "%B %d")
         d = d.replace(year=now.year)
         if d.date() < now.date():
@@ -334,9 +353,11 @@ def infer_status(subject, body_text, carrier, tracking_number):
         return "shipped"
     if any(k in combined for k in ("shipped", "dispatched", "on the way")):
         return "shipped"
-    if any(k in combined for k in ("order confirmed", "order confirmation", "thank you for your order", "we've received your order")):
+    if any(k in combined for k in (
+        "order confirmed", "order confirmation",
+        "thank you for your order", "we've received your order"
+    )):
         return "processing"
-    # If we have a tracking number but no other clues, assume in_transit
     if tracking_number:
         return "in_transit"
     return "processing"
@@ -344,7 +365,6 @@ def infer_status(subject, body_text, carrier, tracking_number):
 
 def build_item_name(subject, retailer):
     """Extract a human-readable item name from the email subject."""
-    # Remove common boilerplate prefixes
     cleaners = [
         r'^(?:your|re:|fw:|fwd:)\s+', r'^(?:from\s+)?[\w\s]+:\s+',
         r'order\s+(?:has\s+)?(?:shipped|confirmed|confirmation|update|status)',
@@ -381,55 +401,68 @@ def parse_sender(from_header):
     return from_header.strip(), ""
 
 
+def _parse_email_date(date_str):
+    """Parse RFC 2822 email date to YYYY-MM-DD."""
+    if not date_str:
+        return None
+    date_str = re.sub(r'\s+\([A-Z]+\)\s*$', '', date_str.strip())
+    for fmt in (
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%d %b %Y %H:%M:%S %z",
+        "%a, %d %b %Y %H:%M:%S",
+        "%d %b %Y %H:%M:%S",
+    ):
+        try:
+            d = datetime.strptime(date_str, fmt)
+            return d.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Core sync logic per account
 # ---------------------------------------------------------------------------
-def sync_account(account):
-    """Fetch and parse emails for one account. Returns list of new order dicts."""
-    import os
-    try:
-        from api._store import orders as store_orders
-    except ImportError:
-        from _store import orders as store_orders
+def sync_account(account, client_id, client_secret, page_token=None):
+    """
+    Fetch and parse emails for one account.
 
-    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
-    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-
-    access_token = account["access_token"]
-    new_orders = []
-
-    # Existing tracking numbers for this account (deduplicate)
-    existing_tracking = {
-        o.get("tracking_number", "").lower()
-        for o in store_orders.values()
-        if o["account_id"] == account["id"] and o.get("tracking_number")
+    Returns a dict:
+    {
+        "orders": [...],          # list of parsed order dicts
+        "updated_token": str|None # new access token if refreshed, else None
+        "next_page_token": str|None
+        "error": str|None
     }
+    """
+    access_token = account.get("access_token", "")
+    refresh_token = account.get("refresh_token", "")
+    email = account.get("email", "")
+    updated_token = None
+
+    list_params = {"q": GMAIL_QUERY, "maxResults": str(MAX_RESULTS)}
+    if page_token:
+        list_params["pageToken"] = page_token
 
     # 1. List messages
-    status, data = gmail_get(
-        "/users/me/messages",
-        access_token,
-        params={"q": GMAIL_QUERY, "maxResults": str(MAX_RESULTS)},
-    )
+    status, data = gmail_get("/users/me/messages", access_token, params=list_params)
 
     # Handle 401: try token refresh
     if status == 401:
-        new_token = refresh_access_token(account.get("refresh_token"), client_id, client_secret)
+        new_token = refresh_access_token(refresh_token, client_id, client_secret)
         if new_token:
-            account["access_token"] = new_token
             access_token = new_token
-            status, data = gmail_get(
-                "/users/me/messages",
-                access_token,
-                params={"q": GMAIL_QUERY, "maxResults": str(MAX_RESULTS)},
-            )
+            updated_token = new_token
+            status, data = gmail_get("/users/me/messages", access_token, params=list_params)
         else:
-            return new_orders  # Can't authenticate
+            return {"orders": [], "updated_token": None, "next_page_token": None, "error": "auth_failed"}
 
     if status != 200:
-        return new_orders
+        return {"orders": [], "updated_token": updated_token, "next_page_token": None, "error": f"gmail_error_{status}"}
 
     messages = data.get("messages", [])
+    next_page_token = data.get("nextPageToken")
+    orders = []
 
     for msg_ref in messages:
         msg_id = msg_ref.get("id")
@@ -443,10 +476,10 @@ def sync_account(account):
             params={"format": "full"},
         )
         if msg_status == 401:
-            new_token = refresh_access_token(account.get("refresh_token"), client_id, client_secret)
+            new_token = refresh_access_token(refresh_token, client_id, client_secret)
             if new_token:
-                account["access_token"] = new_token
                 access_token = new_token
+                updated_token = new_token
                 msg_status, msg = gmail_get(
                     f"/users/me/messages/{msg_id}",
                     access_token,
@@ -478,26 +511,22 @@ def sync_account(account):
         if not carrier and carrier_from_sender:
             carrier = carrier_from_sender
 
-        # 7. Deduplicate by tracking number
-        if tracking_number and tracking_number.lower() in existing_tracking:
-            continue
-
-        # 8. Extract cost
+        # 7. Extract cost
         cost = extract_cost(combined_text)
 
-        # 9. Extract estimated delivery
+        # 8. Extract estimated delivery
         est_delivery = extract_delivery_date(combined_text)
 
-        # 10. Parse order date from email date header
+        # 9. Parse order date from email date header
         order_date = _parse_email_date(date_header)
 
-        # 11. Infer status
+        # 10. Infer status
         status_val = infer_status(subject, body_text, carrier, tracking_number)
 
-        # 12. Build item name
+        # 11. Build item name
         item_name = build_item_name(subject, retailer)
 
-        # 13. Build tracking URL
+        # 12. Build tracking URL
         if tracking_number and carrier:
             base_url = CARRIER_TRACKING_URLS.get(carrier, "")
             tracking_url = base_url + tracking_number if base_url else ""
@@ -506,12 +535,10 @@ def sync_account(account):
             tracking_number = tracking_number or ""
             carrier = carrier or "Unknown"
 
-        order_data = {
-            "account_id": account["id"],
+        orders.append({
+            "account_email": email,
             "retailer": retailer,
             "item_name": item_name,
-            "item_description": "",
-            "item_image_url": "",
             "order_cost": cost,
             "order_date": order_date or datetime.now().strftime("%Y-%m-%d"),
             "shipping_carrier": carrier,
@@ -522,34 +549,14 @@ def sync_account(account):
             "raw_email_subject": subject,
             "raw_email_date": date_header,
             "gmail_message_id": msg_id,
-        }
+        })
 
-        if tracking_number:
-            existing_tracking.add(tracking_number.lower())
-
-        new_orders.append(order_data)
-
-    return new_orders
-
-
-def _parse_email_date(date_str):
-    """Parse RFC 2822 email date to YYYY-MM-DD."""
-    if not date_str:
-        return None
-    # Strip timezone name in parens
-    date_str = re.sub(r'\s+\([A-Z]+\)\s*$', '', date_str.strip())
-    for fmt in (
-        "%a, %d %b %Y %H:%M:%S %z",
-        "%d %b %Y %H:%M:%S %z",
-        "%a, %d %b %Y %H:%M:%S",
-        "%d %b %Y %H:%M:%S",
-    ):
-        try:
-            d = datetime.strptime(date_str, fmt)
-            return d.strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-    return None
+    return {
+        "orders": orders,
+        "updated_token": updated_token,
+        "next_page_token": next_page_token,
+        "error": None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -563,36 +570,47 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        try:
-            from api._store import accounts, add_order
-        except ImportError:
-            from _store import accounts, add_order
+        client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
-        if not accounts:
-            _send_json(self, {"success": True, "synced": 0, "new_orders": 0, "message": "No accounts connected"})
+        # Read request body
+        content_length = int(self.headers.get("Content-Length", 0))
+        body_bytes = self.rfile.read(content_length) if content_length > 0 else b"{}"
+        try:
+            body = json.loads(body_bytes)
+        except (json.JSONDecodeError, ValueError):
+            _send_json(self, {"success": False, "error": "Invalid JSON body"}, 400)
             return
 
-        now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        total_new = 0
+        accounts = body.get("accounts", [])
+        page_token = body.get("page_token")
 
-        for account in accounts.values():
-            new_orders = []
+        if not accounts:
+            _send_json(self, {"success": True, "orders": [], "token_updates": {}, "message": "No accounts provided"})
+            return
+
+        all_orders = []
+        token_updates = {}  # email -> new access_token
+        account_errors = {}
+
+        for account in accounts:
+            email = account.get("email", "")
             try:
-                new_orders = sync_account(account)
-            except Exception as e:
-                pass  # Don't let one account failure block others
-
-            for order_data in new_orders:
-                add_order(**order_data)
-                total_new += 1
-
-            account["last_synced"] = now_ts
+                result = sync_account(account, client_id, client_secret, page_token)
+                all_orders.extend(result["orders"])
+                if result["updated_token"]:
+                    token_updates[email] = result["updated_token"]
+                if result["error"]:
+                    account_errors[email] = result["error"]
+            except Exception as exc:
+                account_errors[email] = str(exc)
 
         _send_json(self, {
             "success": True,
-            "synced": len(accounts),
-            "new_orders": total_new,
-            "synced_at": now_ts,
+            "orders": all_orders,
+            "token_updates": token_updates,
+            "account_errors": account_errors,
+            "synced_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
         })
 
     def log_message(self, *args):

@@ -1,11 +1,13 @@
 {
-  "rewrites": [
-    { "source": "/api/auth",      "destination": "/api/auth" },
-    { "source": "/api/callback",  "destination": "/api/callback" },
-    { "source": "/api/accounts",  "destination": "/api/accounts" },
-    { "source": "/api/sync",      "destination": "/api/sync" },
-    { "source": "/api/orders",    "destination": "/api/orders" },
-    { "source": "/api/order",     "destination": "/api/order" },
-    { "source": "/api/stats",     "destination": "/api/stats" }
+  "version": 2,
+  "builds": [
+    {"src": "api/**/*.py", "use": "@vercel/python"},
+    {"src": "public/**", "use": "@vercel/static"}
+  ],
+  "routes": [
+    {"src": "/api/auth", "dest": "/api/auth.py"},
+    {"src": "/api/callback", "dest": "/api/callback.py"},
+    {"src": "/api/sync", "dest": "/api/sync.py"},
+    {"src": "/(.*)", "dest": "/public/$1"}
   ]
 }

@@ -24,15 +24,15 @@
             </a>
             <div class="nav-links">
                 <a href="#dashboard" class="nav-link" data-page="dashboard">Dashboard</a>
-                <a href="#settings" class="nav-link" data-page="settings">Settings</a>
+                <a href="#settings"  class="nav-link" data-page="settings">Accounts</a>
             </div>
         </div>
         <div class="nav-right">
             <div class="sync-indicator" id="syncIndicator" style="display:none;">
                 <span class="sync-dot"></span>
-                <span class="sync-text" id="syncText">Last synced: just now</span>
+                <span class="sync-text" id="syncText">Not yet synced</span>
             </div>
-            <button class="btn-sync" id="btnSync" title="Sync emails now" style="display:none;">
+            <button class="btn-sync" id="btnSync" title="Sync emails now" style="display:none;" aria-label="Sync">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M2 8C2 4.686 4.686 2 8 2C10.21 2 12.117 3.253 13.064 5.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                     <path d="M14 8C14 11.314 11.314 14 8 14C5.79 14 3.883 12.747 2.936 10.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -50,7 +50,7 @@
                     <div class="dropdown-header">Connected Accounts</div>
                     <div id="dropdownAccountsList"></div>
                     <div class="dropdown-divider"></div>
-                    <a href="/api/auth" class="dropdown-item dropdown-item-action" id="dropdownAddAccount">
+                    <a href="/api/auth" class="dropdown-item dropdown-item-action">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7 4V10M4 7H10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                         Add Another Account
                     </a>
@@ -183,7 +183,7 @@
                             <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/>
                             <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/>
                         </svg>
-                    </button>
+ractors                    </button>
                     <button class="view-btn" id="btnViewList" title="List view" aria-label="List view">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                             <path d="M3 4H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -224,17 +224,26 @@
         <div class="empty-state" id="emptyState" style="display:none;">
             <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="12" width="40" height="28" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 18H44" stroke="currentColor" stroke-width="1.5"/><path d="M16 6L24 12L32 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <p id="emptyStateMsg">No orders found. Connect a Gmail account and sync to pull your shipments.</p>
+            <a href="/api/auth" class="btn-gmail-connect btn-gmail-sm" style="margin-top:24px;display:inline-flex;">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19.6 10.23c0-.68-.06-1.36-.18-2H10v3.77h5.4a4.62 4.62 0 0 1-2 3.04v2.52h3.23c1.89-1.74 2.97-4.3 2.97-7.33z" fill="#4285F4"/>
+                    <path d="M10 20c2.7 0 4.97-.9 6.63-2.44l-3.23-2.52c-.9.6-2.04.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H1.07v2.6A9.99 9.99 0 0 0 10 20z" fill="#34A853"/>
+                    <path d="M4.4 11.88A6.02 6.02 0 0 1 4.08 10c0-.65.11-1.28.32-1.88V5.52H1.07A9.99 9.99 0 0 0 0 10c0 1.61.39 3.14 1.07 4.48l3.33-2.6z" fill="#FBBC05"/>
+                    <path d="M10 3.98c1.46 0 2.78.5 3.81 1.49l2.86-2.86C14.97.9 12.7 0 10 0A9.99 9.99 0 0 0 1.07 5.52l3.33 2.6C5.2 5.74 7.4 3.98 10 3.98z" fill="#EA4335"/>
+                </svg>
+                Connect Gmail Account
+            </a>
         </div>
     </main>
 
-    <!-- SETTINGS PAGE -->
+    <!-- SETTINGS / ACCOUNTS PAGE -->
     <main class="page page-settings" id="pageSettings" style="display:none;">
         <div class="settings-wrapper">
-            <h2 class="settings-title">Settings</h2>
+            <h2 class="settings-title">Accounts</h2>
 
             <div class="settings-section">
-                <h3 class="settings-section-title">Connected Accounts</h3>
-                <p class="settings-section-desc">Each connected Gmail account is scanned for order confirmations and shipping notifications. ShipPull has read-only access — it never sends emails or modifies your inbox.</p>
+                <h3 class="settings-section-title">Connected Gmail Accounts</h3>
+                <p class="settings-section-desc">Each connected Gmail account is scanned for order confirmations and shipping notifications. ShipPull has read-only access — it never sends emails or modifies your inbox. Your tokens are stored only in this browser's localStorage.</p>
 
                 <div class="accounts-list" id="settingsAccountsList">
                     <!-- Dynamically populated -->
@@ -254,52 +263,14 @@
             </div>
 
             <div class="settings-section">
-                <h3 class="settings-section-title">Email Parsing</h3>
-                <p class="settings-section-desc">Configure how ShipPull processes your emails.</p>
+                <h3 class="settings-section-title">Data &amp; Privacy</h3>
+                <p class="settings-section-desc">ShipPull stores all data locally in your browser. Nothing is saved on any server. Your OAuth tokens are only ever sent to the sync endpoint to authenticate Gmail API requests.</p>
                 <div class="settings-option">
                     <div class="settings-option-info">
-                        <span class="settings-option-label">Auto-sync frequency</span>
-                        <span class="settings-option-desc">How often ShipPull checks for new emails (requires page reload)</span>
+                        <span class="settings-option-label">Clear all local data</span>
+                        <span class="settings-option-desc">Remove all stored accounts and orders from this browser</span>
                     </div>
-                    <select class="filter-select">
-                        <option>Every 15 minutes</option>
-                        <option>Every 30 minutes</option>
-                        <option selected>Every hour</option>
-                        <option>Every 6 hours</option>
-                    </select>
-                </div>
-                <div class="settings-option">
-                    <div class="settings-option-info">
-                        <span class="settings-option-label">Parse order confirmations</span>
-                        <span class="settings-option-desc">Detect new orders from retailer emails</span>
-                    </div>
-                    <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-                </div>
-                <div class="settings-option">
-                    <div class="settings-option-info">
-                        <span class="settings-option-label">Parse shipping notifications</span>
-                        <span class="settings-option-desc">Detect tracking updates and delivery status</span>
-                    </div>
-                    <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-                </div>
-            </div>
-
-            <div class="settings-section">
-                <h3 class="settings-section-title">Notifications</h3>
-                <p class="settings-section-desc">Get notified about important shipment updates.</p>
-                <div class="settings-option">
-                    <div class="settings-option-info">
-                        <span class="settings-option-label">Delivery notifications</span>
-                        <span class="settings-option-desc">Notify when a package is delivered</span>
-                    </div>
-                    <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-                </div>
-                <div class="settings-option">
-                    <div class="settings-option-info">
-                        <span class="settings-option-label">Shipping delay alerts</span>
-                        <span class="settings-option-desc">Notify when an ETA changes or shipment is delayed</span>
-                    </div>
-                    <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    <button class="btn-remove" onclick="clearAllData()">Clear Data</button>
                 </div>
             </div>
         </div>
@@ -308,7 +279,7 @@
     <!-- ORDER DETAIL MODAL -->
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal" id="orderModal">
-            <button class="modal-close" id="modalClose">
+            <button class="modal-close" id="modalClose" aria-label="Close">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5L15 15M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </button>
             <div class="modal-content" id="modalContent">
@@ -317,6 +288,15 @@
         </div>
     </div>
 
+    <script>
+        // clearAllData is called from inline onclick in settings — needs to be global
+        function clearAllData() {
+            if (!confirm('Clear all ShipPull data from this browser? This cannot be undone.')) return;
+            localStorage.removeItem('shippull_accounts');
+            localStorage.removeItem('shippull_orders');
+            location.href = '/';
+        }
+    </script>
     <script src="./app.js"></script>
 </body>
 </html>

@@ -1,12 +1,14 @@
 """
 api/callback.py
 GET /api/callback — Handle the Google OAuth2 callback.
-Exchanges auth code for tokens, stores the account, seeds initial sync, redirects to frontend.
+Exchanges auth code for tokens, fetches user email, then redirects
+to the frontend with tokens in the URL fragment (hash) so they never
+appear in server logs.
 """
 import json
 import os
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs, urlencode
+from urllib.parse import urlparse, parse_qs, urlencode, quote
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
@@ -38,12 +40,12 @@ class handler(BaseHTTPRequestHandler):
 
         error = params.get("error", [""])[0]
         if error:
-            _redirect(self, f"{app_url}/#connect?error={error}")
+            _redirect(self, f"{app_url}/#/callback?error={quote(error)}")
             return
 
         code = params.get("code", [""])[0]
         if not code:
-            _redirect(self, f"{app_url}/#connect?error=no_code")
+            _redirect(self, f"{app_url}/#/callback?error=no_code")
             return
 
         # Exchange code for tokens
@@ -65,15 +67,15 @@ class handler(BaseHTTPRequestHandler):
         try:
             resp = urlopen(req, timeout=10)
             tokens = json.loads(resp.read())
-        except (HTTPError, URLError) as e:
-            _redirect(self, f"{app_url}/#connect?error=token_exchange")
+        except (HTTPError, URLError):
+            _redirect(self, f"{app_url}/#/callback?error=token_exchange")
             return
 
         access_token = tokens.get("access_token", "")
         refresh_token = tokens.get("refresh_token", "")
 
         if not access_token:
-            _redirect(self, f"{app_url}/#connect?error=no_access_token")
+            _redirect(self, f"{app_url}/#/callback?error=no_access_token")
             return
 
         # Fetch user email via userinfo endpoint
@@ -87,25 +89,18 @@ class handler(BaseHTTPRequestHandler):
             email = ""
 
         if not email:
-            _redirect(self, f"{app_url}/#connect?error=no_email")
+            _redirect(self, f"{app_url}/#/callback?error=no_email")
             return
 
-        # Store / update account
-        try:
-            from api._store import add_account, get_account_by_email
-        except ImportError:
-            from _store import add_account, get_account_by_email
-
-        existing = get_account_by_email(email)
-        if existing:
-            existing["access_token"] = access_token
-            if refresh_token:
-                existing["refresh_token"] = refresh_token
-        else:
-            add_account(email, access_token, refresh_token)
-
-        # Redirect to dashboard with success flag
-        _redirect(self, f"{app_url}/#dashboard?connected=1")
+        # Redirect to frontend with tokens in the URL fragment.
+        # Using the fragment (#) means the tokens are never sent to the server
+        # in future requests and don't appear in server-side access logs.
+        fragment_params = urlencode({
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "email": email,
+        })
+        _redirect(self, f"{app_url}/#/callback?{fragment_params}")
 
     def log_message(self, *args):
         pass
