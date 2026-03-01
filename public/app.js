@@ -424,10 +424,20 @@ function createOrderCard(order) {
     const color       = accountColor(order.account_email || '');
     const costStr     = order.order_cost ? `$${Number(order.order_cost).toFixed(2)}` : '—';
 
+    // Product image or letter placeholder
+    const imageHtml = order.item_image_url
+        ? `<img src="${escHtml(order.item_image_url)}" alt="${escHtml(order.retailer || '')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><span class="card-image-placeholder" style="display:none">${initial}</span>`
+        : `<span class="card-image-placeholder">${initial}</span>`;
+
+    // Tracking row — prominent link or "Awaiting tracking"
+    const trackingHtml = order.tracking_number
+        ? `<a href="${escHtml(order.tracking_url || '#')}" class="tracking-link" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Track with ${escHtml(order.shipping_carrier || 'carrier')}">${escHtml(order.tracking_number)}</a>`
+        : `<span class="tracking-awaiting">Awaiting tracking</span>`;
+
     return `<div class="order-card" data-id="${escHtml(order.gmail_message_id)}" data-status="${order.status}">
         <div class="card-header">
             <div class="card-image">
-                <span class="card-image-placeholder">${initial}</span>
+                ${imageHtml}
             </div>
             <div class="card-info">
                 <div class="card-retailer">${escHtml(order.retailer || 'Unknown')}</div>
@@ -442,18 +452,19 @@ function createOrderCard(order) {
             </div>
             <div class="card-row">
                 <span class="card-label">Carrier</span>
-                <span class="card-value">${escHtml(order.shipping_carrier || '—')}</span>
+                <span class="card-value">${escHtml(order.shipping_carrier && order.shipping_carrier !== 'Unknown' ? order.shipping_carrier : '—')}</span>
             </div>
             <div class="card-row">
                 <span class="card-label">Tracking</span>
-                <span class="card-value">${order.tracking_number
-                    ? `<a href="${escHtml(order.tracking_url || '#')}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${escHtml(order.tracking_number)}</a>`
-                    : '—'
-                }</span>
+                <span class="card-value">${trackingHtml}</span>
+            </div>
+            <div class="card-row">
+                <span class="card-label">Date</span>
+                <span class="card-value">${formatDate(order.order_date)}</span>
             </div>
             <div class="card-row">
                 <span class="card-label">ETA</span>
-                <span class="card-value">${formatDate(order.estimated_delivery)}</span>
+                <span class="card-value">${formatDate(order.estimated_delivery) !== '—' ? formatDate(order.estimated_delivery) : '<span class="text-muted">—</span>'}</span>
             </div>
             <div class="card-row">
                 <span class="card-label">Account</span>
@@ -474,7 +485,11 @@ function createOrderRow(order) {
     const costStr     = order.order_cost ? `$${Number(order.order_cost).toFixed(2)}` : '—';
     const trackingHtml = order.tracking_number
         ? `<a href="${escHtml(order.tracking_url || '#')}" target="_blank" rel="noopener noreferrer">${escHtml(order.tracking_number)}</a>`
-        : '—';
+        : '<span class="tracking-awaiting">—</span>';
+
+    const thumbHtml = order.item_image_url
+        ? `<img src="${escHtml(order.item_image_url)}" class="table-thumb" alt="" onerror="this.style.display='none'">`
+        : '';
 
     return `<tr class="order-table-row" data-id="${escHtml(order.gmail_message_id)}">
         <td>
@@ -483,10 +498,15 @@ function createOrderRow(order) {
                 <span>${statusText}</span>
             </div>
         </td>
-        <td><span class="table-item-name" title="${escHtml(order.item_name || '')}">${escHtml(order.item_name || 'Order')}</span></td>
+        <td>
+            <div class="table-item-cell">
+                ${thumbHtml}
+                <span class="table-item-name" title="${escHtml(order.item_name || '')}">${escHtml(order.item_name || 'Order')}</span>
+            </div>
+        </td>
         <td><span class="table-retailer">${escHtml(order.retailer || '—')}</span></td>
         <td><span class="table-cost">${costStr}</span></td>
-        <td><span class="table-carrier">${escHtml(order.shipping_carrier || '—')}</span></td>
+        <td><span class="table-carrier">${escHtml(order.shipping_carrier && order.shipping_carrier !== 'Unknown' ? order.shipping_carrier : '—')}</span></td>
         <td class="table-tracking">${trackingHtml}</td>
         <td><span class="table-eta">${formatDate(order.estimated_delivery)}</span></td>
         <td>
@@ -575,13 +595,19 @@ function renderOrderModal(order) {
     }).join('');
 
     const trackingHtml = order.tracking_number
-        ? `<a href="${escHtml(order.tracking_url || '#')}" target="_blank" rel="noopener noreferrer">${escHtml(order.tracking_number)}</a>`
-        : '—';
+        ? `<a href="${escHtml(order.tracking_url || '#')}" class="tracking-link" target="_blank" rel="noopener noreferrer">${escHtml(order.tracking_number)}</a>`
+        : '<span class="tracking-awaiting">Awaiting tracking</span>';
+
+    // Modal image: show product image if available, with fallback
+    const modalImageHtml = order.item_image_url
+        ? `<img src="${escHtml(order.item_image_url)}" alt="${escHtml(order.retailer || '')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+           <span class="modal-image-placeholder" style="display:none">${initial}</span>`
+        : `<span class="modal-image-placeholder">${initial}</span>`;
 
     return `
         <div class="modal-header">
             <div class="modal-image">
-                <span class="modal-image-placeholder">${initial}</span>
+                ${modalImageHtml}
             </div>
             <div class="modal-title-section">
                 <div class="modal-retailer">${escHtml(order.retailer || 'Unknown')}</div>
@@ -606,7 +632,7 @@ function renderOrderModal(order) {
             </div>
             <div class="modal-detail-item">
                 <div class="modal-detail-label">Carrier</div>
-                <div class="modal-detail-value">${escHtml(order.shipping_carrier || '—')}</div>
+                <div class="modal-detail-value">${escHtml(order.shipping_carrier && order.shipping_carrier !== 'Unknown' ? order.shipping_carrier : '—')}</div>
             </div>
             <div class="modal-detail-item">
                 <div class="modal-detail-label">Est. Delivery</div>
@@ -686,9 +712,14 @@ async function syncAccounts(isInitial = false) {
         return;
     }
 
-    const btn = document.getElementById('btnSync');
+    const btn     = document.getElementById('btnSync');
+    const bannerBtn = document.getElementById('btnSyncBanner');
     btn.classList.add('syncing');
     btn.disabled = true;
+    if (bannerBtn) {
+        bannerBtn.classList.add('syncing');
+        bannerBtn.disabled = true;
+    }
 
     if (currentPage === 'dashboard') showLoadingSkeleton();
 
@@ -771,6 +802,10 @@ async function syncAccounts(isInitial = false) {
     } finally {
         btn.classList.remove('syncing');
         btn.disabled = false;
+        if (bannerBtn) {
+            bannerBtn.classList.remove('syncing');
+            bannerBtn.disabled = false;
+        }
     }
 }
 

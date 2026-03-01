@@ -108,12 +108,16 @@ TRACKING_PATTERNS = [
     ("USPS",  re.compile(r'\b(9[234]\d{18,22})\b')),
     # USPS intelligent mail: ~20 digit numbers beginning with common prefixes
     ("USPS",  re.compile(r'\b(420\d{17,22})\b')),
-    # FedEx: 15 digit all-numeric
-    ("FedEx", re.compile(r'\b(\d{15})\b')),
-    # FedEx: 12 digit all-numeric
-    ("FedEx", re.compile(r'\b(\d{12})\b')),
-    # DHL: 10 digit
-    ("DHL",   re.compile(r'\b(\d{10})\b')),
+    # Amazon TBA tracking
+    ("Amazon", re.compile(r'\b(TBA\d{10,})\b')),
+    # OnTrac tracking
+    ("OnTrac", re.compile(r'\b([CD]\d{14})\b')),
+    # FedEx: 15 digit all-numeric — require nearby tracking keywords
+    ("FedEx", re.compile(r'(?i)(?:tracking|track|fedex|shipment|ship).{0,200}\b(\d{15})\b')),
+    # FedEx: 12 digit all-numeric — require nearby tracking keywords
+    ("FedEx", re.compile(r'(?i)(?:tracking|track|fedex|shipment|ship).{0,200}\b(\d{12})\b')),
+    # DHL: full express format JD + digits, or 10 digit only when DHL keyword is nearby
+    ("DHL",   re.compile(r'\b(JD\d{18})\b')),
 ]
 
 # ---------------------------------------------------------------------------
@@ -147,7 +151,7 @@ GMAIL_QUERY = (
     '"order confirmation" OR "shipping confirmation" OR "your order")'
 )
 
-MAX_RESULTS = 50
+MAX_RESULTS = 100
 
 
 # ---------------------------------------------------------------------------
@@ -262,8 +266,288 @@ def extract_tracking_number(text):
     for carrier, pattern in TRACKING_PATTERNS:
         m = pattern.search(text)
         if m:
+            # For patterns with a lookahead group, group(1) is the tracking number
             return carrier, m.group(1)
     return None, None
+
+
+def _extract_url_param(url, param_names):
+    """Extract a query parameter value from a URL string."""
+    for param in param_names:
+        # Try ?param=VALUE or &param=VALUE
+        m = re.search(r'(?:[?&])' + re.escape(param) + r'=([^&\s"]+)', url, re.IGNORECASE)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _clean_tracking_number(raw):
+    """Strip URL-encoding and whitespace from a candidate tracking number."""
+    if not raw:
+        return ""
+    # URL-decode %20 etc (simple pass)
+    raw = raw.replace("%20", " ").replace("+", " ").strip()
+    return raw
+
+
+def extract_tracking_from_html(html):
+    """
+    Parse <a href> tags from raw HTML email to extract carrier tracking URLs.
+    Returns (carrier, tracking_number, tracking_url) or (None, None, None).
+
+    Checks href for known carrier tracking domains first, then falls back
+    to checking the visible link text for tracking number patterns.
+    """
+    if not html:
+        return None, None, None
+
+    # Find all anchor tags: href and inner text
+    anchor_pattern = re.compile(
+        r'<a[^>]+href=["\']([^"\'\s>]+)["\'][^>]*>(.*?)</a>',
+        re.IGNORECASE | re.DOTALL
+    )
+    # Also match href with unquoted or reversed attr order
+    anchor_pattern2 = re.compile(
+        r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+        re.IGNORECASE | re.DOTALL
+    )
+
+    anchors = []
+    for m in anchor_pattern.finditer(html):
+        href = m.group(1).strip()
+        text = re.sub(r'<[^>]+>', '', m.group(2)).strip()  # strip inner tags
+        anchors.append((href, text))
+
+    if not anchors:
+        for m in anchor_pattern2.finditer(html):
+            href = m.group(1).strip()
+            text = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+            anchors.append((href, text))
+
+    for href, link_text in anchors:
+        href_lower = href.lower()
+
+        # UPS
+        if 'ups.com/track' in href_lower or 'ups.com/webtracking' in href_lower:
+            # Try common param names
+            num = _extract_url_param(href, ['trackNums', 'tracknum', 'InquiryNumber', 'track'])
+            if not num:
+                # Try to find 1Z tracking number in URL
+                m2 = re.search(r'(1Z[A-Z0-9]{16})', href, re.IGNORECASE)
+                num = m2.group(1) if m2 else None
+            if not num:
+                # Try link text
+                m2 = re.search(r'\b(1Z[A-Z0-9]{16})\b', link_text, re.IGNORECASE)
+                num = m2.group(1) if m2 else None
+            if num:
+                return "UPS", _clean_tracking_number(num), href
+
+        # FedEx
+        elif 'fedex.com/fedextrack' in href_lower or 'fedex.com/apps/fedextrack' in href_lower:
+            num = _extract_url_param(href, ['trknbr', 'trackingnumber', 'tracknum', 'data'])
+            if not num:
+                m2 = re.search(r'\b(\d{12}|\d{15})\b', href)
+                num = m2.group(1) if m2 else None
+            if not num:
+                m2 = re.search(r'\b(\d{12}|\d{15})\b', link_text)
+                num = m2.group(1) if m2 else None
+            if num:
+                return "FedEx", _clean_tracking_number(num), href
+
+        # USPS
+        elif 'tools.usps.com' in href_lower or 'usps.com/go/track' in href_lower or \
+             'usps.com/go/TrackConfirm' in href:
+            num = _extract_url_param(href, ['tLabels', 'label', 'trackId', 'labelNumber'])
+            if not num:
+                m2 = re.search(r'\b(9[234]\d{18,22}|420\d{17,22})\b', href)
+                num = m2.group(1) if m2 else None
+            if not num:
+                m2 = re.search(r'\b(9[234]\d{18,22}|420\d{17,22})\b', link_text)
+                num = m2.group(1) if m2 else None
+            if num:
+                return "USPS", _clean_tracking_number(num), href
+
+        # DHL
+        elif 'dhl.com/tracking' in href_lower or 'dhl.com/home/tracking' in href_lower or \
+             'dhl.com/en/express/tracking' in href_lower:
+            num = _extract_url_param(href, ['tracking-id', 'AWB', 'trackingNumber', 'id'])
+            if not num:
+                m2 = re.search(r'\b(JD\d{18}|\d{10,11})\b', href)
+                num = m2.group(1) if m2 else None
+            if not num:
+                m2 = re.search(r'\b(JD\d{18}|[0-9]{10,11})\b', link_text)
+                num = m2.group(1) if m2 else None
+            if num:
+                return "DHL", _clean_tracking_number(num), href
+
+        # Narvar (third-party tracking portal used by many retailers)
+        elif 'narvar.com/tracking' in href_lower or '.narvar.com/track' in href_lower:
+            # Narvar URLs often have the carrier tracking num in the path or params
+            num = _extract_url_param(href, ['tracking_number', 'id', 'track'])
+            if not num:
+                # Check link text for common tracking formats
+                m2 = re.search(r'\b(1Z[A-Z0-9]{16}|9[234]\d{18,22}|\d{12}|\d{15}|TBA\d{10,})\b', link_text)
+                num = m2.group(1) if m2 else None
+            if num:
+                carrier = _guess_carrier_from_number(num)
+                return carrier, _clean_tracking_number(num), href
+
+        # AfterShip
+        elif 'aftership.com' in href_lower or 'track.aftership.com' in href_lower:
+            num = _extract_url_param(href, ['number', 'tracking_number', 'id'])
+            if not num:
+                # AfterShip URLs: /trackings/CARRIER/NUMBER
+                m2 = re.search(r'/trackings/[^/]+/([A-Z0-9-]{8,})', href, re.IGNORECASE)
+                num = m2.group(1) if m2 else None
+            if not num:
+                m2 = re.search(r'\b(1Z[A-Z0-9]{16}|9[234]\d{18,22}|\d{12}|\d{15}|TBA\d{10,})\b', link_text)
+                num = m2.group(1) if m2 else None
+            if num:
+                carrier = _guess_carrier_from_number(num)
+                return carrier, _clean_tracking_number(num), href
+
+        # EasyPost
+        elif 'track.easypost.com' in href_lower:
+            num = _extract_url_param(href, ['tracking_code', 'id', 'number'])
+            if not num:
+                m2 = re.search(r'\b(1Z[A-Z0-9]{16}|9[234]\d{18,22}|\d{12}|\d{15})\b', link_text)
+                num = m2.group(1) if m2 else None
+            if num:
+                carrier = _guess_carrier_from_number(num)
+                return carrier, _clean_tracking_number(num), href
+
+        # PackageTrackr
+        elif 'packagetrackr.com' in href_lower:
+            m2 = re.search(r'/track/([A-Z0-9]{8,})', href, re.IGNORECASE)
+            num = m2.group(1) if m2 else None
+            if num:
+                carrier = _guess_carrier_from_number(num)
+                return carrier, _clean_tracking_number(num), href
+
+        # Generic: any link whose text looks like a tracking number
+        # (catches cases where the link text IS the tracking number)
+        if not any(skip in href_lower for skip in ('unsubscribe', 'mailto', 'javascript')):
+            for carrier_name, pat in TRACKING_PATTERNS[:5]:  # UPS, USPS, USPS, Amazon, OnTrac only
+                m2 = pat.search(link_text)
+                if m2:
+                    return carrier_name, m2.group(1), href
+
+    return None, None, None
+
+
+def _guess_carrier_from_number(num):
+    """Guess carrier from tracking number format."""
+    if re.match(r'^1Z[A-Z0-9]{16}$', num, re.IGNORECASE):
+        return "UPS"
+    if re.match(r'^9[234]\d{18,22}$', num) or re.match(r'^420\d{17,22}$', num):
+        return "USPS"
+    if re.match(r'^TBA\d{10,}$', num, re.IGNORECASE):
+        return "Amazon"
+    if re.match(r'^JD\d{18}$', num):
+        return "DHL"
+    if re.match(r'^\d{15}$', num) or re.match(r'^\d{12}$', num):
+        return "FedEx"
+    return "Unknown"
+
+
+# Image URL blocklist patterns (compiled once)
+_IMG_SKIP_URL = re.compile(
+    r'pixel|beacon|spacer|transparent|blank|1x1|track|open|email-open|'
+    r'logo|icon|favicon|header|footer|social|facebook|twitter|instagram|'
+    r'linkedin|pinterest|youtube|badge|button|banner|sprite|arrow|'
+    r'unsubscribe|powered-by|email-template|separator|divider|line|'
+    r'background|bg[-_]|corner|bullet|star|check|rating',
+    re.IGNORECASE
+)
+_IMG_SKIP_DIMS = re.compile(r'width=["\']?1["\']?|height=["\']?1["\']?', re.IGNORECASE)
+
+
+def extract_product_images(html):
+    """
+    Extract the best candidate product image URL from HTML email.
+    Returns a URL string or empty string.
+    """
+    if not html:
+        return ""
+
+    # Find all <img> tags
+    img_pattern = re.compile(r'<img\b[^>]+>', re.IGNORECASE | re.DOTALL)
+    src_pattern  = re.compile(r'\bsrc=["\']([^"\'\s>]+)["\']', re.IGNORECASE)
+    alt_pattern  = re.compile(r'\balt=["\']([^"\']*)["\']', re.IGNORECASE)
+    width_pattern  = re.compile(r'\bwidth=["\']?(\d+)["\']?', re.IGNORECASE)
+    height_pattern = re.compile(r'\bheight=["\']?(\d+)["\']?', re.IGNORECASE)
+
+    candidates = []  # (score, url)
+
+    for img_tag in img_pattern.finditer(html):
+        tag = img_tag.group(0)
+
+        src_m = src_pattern.search(tag)
+        if not src_m:
+            continue
+        src = src_m.group(1).strip()
+
+        # Must be HTTPS
+        if not src.startswith('https://'):
+            continue
+
+        # Skip 1-pixel tracking images by dimension attributes
+        w_m = width_pattern.search(tag)
+        h_m = height_pattern.search(tag)
+        w = int(w_m.group(1)) if w_m else None
+        h = int(h_m.group(1)) if h_m else None
+        if (w is not None and w <= 1) or (h is not None and h <= 1):
+            continue
+        # Skip small images (likely icons/badges)
+        if (w is not None and w < 30) or (h is not None and h < 30):
+            continue
+
+        # Skip by URL patterns
+        if _IMG_SKIP_URL.search(src):
+            continue
+
+        # Compute a score to rank product image quality
+        score = 0
+
+        # Prefer Amazon product images
+        if 'm.media-amazon.com' in src or 'images-na.ssl-images-amazon.com' in src or \
+           'images-amazon.com' in src:
+            score += 50
+
+        # Prefer larger declared dimensions
+        if w is not None and h is not None:
+            area = w * h
+            if area >= 40000:   # 200x200+
+                score += 30
+            elif area >= 10000:  # 100x100+
+                score += 15
+            elif area >= 2500:   # 50x50+
+                score += 5
+
+        # Prefer images with meaningful alt text
+        alt_m = alt_pattern.search(tag)
+        alt = alt_m.group(1).strip() if alt_m else ""
+        if alt and len(alt) > 3:
+            score += 10
+
+        # Prefer CDN/product image URLs
+        if any(cdn in src for cdn in ('cdn.shopify', 'cdn.shopifycdn', 'cloudinary',
+                                       'fastly.net', 'akamaihd', 'scene7.com',
+                                       'res.cloudinary', 'images.ctfassets')):
+            score += 20
+
+        # Skip very low-score candidates
+        if score < 0:
+            continue
+
+        candidates.append((score, src))
+
+    if not candidates:
+        return ""
+
+    # Return highest-scoring image URL
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
 
 
 def extract_cost(text):
@@ -506,10 +790,33 @@ def sync_account(account, client_id, client_secret, page_token=None):
 
         combined_text = subject + "\n" + body_text
 
-        # 6. Find tracking number
-        carrier, tracking_number = extract_tracking_number(combined_text)
-        if not carrier and carrier_from_sender:
-            carrier = carrier_from_sender
+        # 5.5 Extract tracking from HTML links (higher priority than regex)
+        html_carrier, html_tracking, html_tracking_url = extract_tracking_from_html(text_html)
+
+        # 5.6 Extract product image
+        image_url = extract_product_images(text_html)
+
+        # 6. Find tracking number — prefer HTML link extraction over regex
+        if html_tracking:
+            carrier = html_carrier or carrier_from_sender or "Unknown"
+            tracking_number = html_tracking
+            tracking_url = html_tracking_url or ""
+        else:
+            carrier, tracking_number = extract_tracking_number(combined_text)
+            if not carrier and carrier_from_sender:
+                carrier = carrier_from_sender
+            # Build tracking URL from carrier base
+            if tracking_number and carrier:
+                base_url = CARRIER_TRACKING_URLS.get(carrier, "")
+                tracking_url = base_url + tracking_number if base_url else ""
+            else:
+                tracking_url = ""
+
+        tracking_number = tracking_number or ""
+        carrier = carrier or "Unknown"
+        if not tracking_url and tracking_number and carrier:
+            base_url = CARRIER_TRACKING_URLS.get(carrier, "")
+            tracking_url = base_url + tracking_number if base_url else ""
 
         # 7. Extract cost
         cost = extract_cost(combined_text)
@@ -526,15 +833,6 @@ def sync_account(account, client_id, client_secret, page_token=None):
         # 11. Build item name
         item_name = build_item_name(subject, retailer)
 
-        # 12. Build tracking URL
-        if tracking_number and carrier:
-            base_url = CARRIER_TRACKING_URLS.get(carrier, "")
-            tracking_url = base_url + tracking_number if base_url else ""
-        else:
-            tracking_url = ""
-            tracking_number = tracking_number or ""
-            carrier = carrier or "Unknown"
-
         orders.append({
             "account_email": email,
             "retailer": retailer,
@@ -546,6 +844,7 @@ def sync_account(account, client_id, client_secret, page_token=None):
             "tracking_url": tracking_url,
             "estimated_delivery": est_delivery or "",
             "status": status_val,
+            "item_image_url": image_url,
             "raw_email_subject": subject,
             "raw_email_date": date_header,
             "gmail_message_id": msg_id,

@@ -39,6 +39,7 @@
                     <path d="M10 5H13.5V1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     <path d="M6 11H2.5V14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
+                <span class="btn-sync-label">Sync</span>
             </button>
             <div class="accounts-dropdown" id="accountsDropdown" style="display:none;">
                 <button class="btn-accounts" id="btnAccounts">
@@ -126,6 +127,28 @@
 
     <!-- DASHBOARD PAGE -->
     <main class="page page-dashboard" id="pageDashboard" style="display:none;">
+        <!-- Sync Banner -->
+        <div class="sync-banner" id="syncBanner">
+            <div class="sync-banner-text">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0">
+                    <path d="M2 8C2 4.686 4.686 2 8 2C10.21 2 12.117 3.253 13.064 5.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M14 8C14 11.314 11.314 14 8 14C5.79 14 3.883 12.747 2.936 10.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M10 5H13.5V1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M6 11H2.5V14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Sync your emails to pull the latest orders and tracking info</span>
+            </div>
+            <button class="btn-sync-banner" id="btnSyncBanner" onclick="syncAccounts()">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M2 8C2 4.686 4.686 2 8 2C10.21 2 12.117 3.253 13.064 5.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M14 8C14 11.314 11.314 14 8 14C5.79 14 3.883 12.747 2.936 10.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M10 5H13.5V1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M6 11H2.5V14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Sync Now
+            </button>
+        </div>
+
         <!-- Stats Bar -->
         <div class="stats-bar">
             <div class="stat-card">

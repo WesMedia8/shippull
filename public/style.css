@@ -185,16 +185,23 @@ a:hover { color: var(--accent-cyan); }
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
+    gap: 7px;
+    padding: 0 14px;
     height: 34px;
-    border: 1px solid var(--border-primary);
+    border: 1px solid var(--accent-green);
     border-radius: var(--radius-sm);
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--accent-green);
     cursor: pointer;
     transition: all var(--transition);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
 }
-.btn-sync:hover { border-color: var(--border-hover); color: var(--accent-green); background: var(--bg-tertiary); }
+.btn-sync-label { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
+.btn-sync:hover { background: rgba(34, 197, 94, 0.2); border-color: var(--accent-green); color: var(--accent-green); box-shadow: 0 0 12px rgba(34, 197, 94, 0.2); }
 .btn-sync:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sync.syncing svg { animation: spin 0.8s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -432,6 +439,49 @@ a:hover { color: var(--accent-cyan); }
     padding: 28px 24px;
 }
 
+/* Sync Banner */
+.sync-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    background: rgba(34, 197, 94, 0.06);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: var(--radius-lg);
+    transition: border-color var(--transition);
+}
+.sync-banner:hover { border-color: rgba(34, 197, 94, 0.35); }
+.sync-banner-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: rgba(34, 197, 94, 0.85);
+}
+.btn-sync-banner {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 16px;
+    background: var(--accent-green);
+    color: #0a0a0a;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 200ms ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.btn-sync-banner:hover { background: #16a34a; box-shadow: 0 0 16px rgba(34,197,94,0.35); transform: translateY(-1px); }
+.btn-sync-banner:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.btn-sync-banner.syncing svg { animation: spin 0.8s linear infinite; }
+
 /* Stats Bar */
 .stats-bar {
     display: grid;
@@ -637,13 +687,36 @@ a:hover { color: var(--accent-cyan); }
     align-items: center;
     justify-content: center;
 }
-.card-image img { width: 100%; height: 100%; object-fit: cover; }
+.card-image img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 6px;
+    display: block;
+}
 .card-image-placeholder {
     font-family: var(--font-mono);
     font-size: 22px;
     font-weight: 700;
     color: var(--text-muted);
     user-select: none;
+}
+
+/* List view thumbnail */
+.table-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    border: 1px solid var(--border-subtle);
+    vertical-align: middle;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+.table-item-cell {
+    display: flex;
+    align-items: center;
+    gap: 0;
 }
 
 .card-info { flex: 1; min-width: 0; }
@@ -704,6 +777,24 @@ a:hover { color: var(--accent-cyan); }
     text-overflow: ellipsis;
 }
 .card-value a { font-family: var(--font-mono); font-size: 11px; }
+
+/* Tracking link style */
+.tracking-link {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent-blue);
+    text-decoration: none;
+    transition: color var(--transition);
+}
+.tracking-link:hover { color: var(--accent-cyan); text-decoration: underline; }
+
+/* "Awaiting tracking" label */
+.tracking-awaiting {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+}
 
 /* ============================================
    STATUS BADGE
